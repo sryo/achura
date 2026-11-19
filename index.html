@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>achura</title>
+<link rel="icon" href="docs/logo/achura-icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="achura.css">
+<style>
+:root{--canvas:#FAF9F6;--tile:#FFFFFF;--line:#E7E4DD;--ink:#1A1D2E;--muted:#5F6275;color-scheme:light;
+  --blue:#2F5BEA;--green:#12974A;--red:#D7263D;--orange:#E8890C;--purple:#8452F2;--hue:var(--blue);
+  --sky:#1F8FD0;--pink:#E07AD8;--yellow:#F2C200;--bark:#9A5B2E;--blend:multiply}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--canvas:#0E0F13;--tile:#1D1F27;--line:#2C2F3A;--ink:#EDEEF3;--muted:#A3A6B6;color-scheme:dark;
+  --blue:#6B8CFF;--green:#3DDC84;--red:#FF5C6B;--orange:#FFA94D;--purple:#A585FF;
+  --sky:#3AA3E6;--pink:#EA8BE2;--yellow:#FFD84D;--bark:#D69A6A;--blend:screen}}
+:root[data-theme="dark"]{--canvas:#0E0F13;--tile:#1D1F27;--line:#2C2F3A;--ink:#EDEEF3;--muted:#A3A6B6;color-scheme:dark;
+  --blue:#6B8CFF;--green:#3DDC84;--red:#FF5C6B;--orange:#FFA94D;--purple:#A585FF;
+  --sky:#3AA3E6;--pink:#EA8BE2;--yellow:#FFD84D;--bark:#D69A6A;--blend:screen}
+*{box-sizing:border-box}
+body{margin:0;background:var(--canvas);color:var(--ink);font:15px/1.45 system-ui,-apple-system,sans-serif}
+main{max-width:760px;margin:0 auto;padding:32px 16px 64px;display:flex;flex-direction:column;gap:16px}
+h1{font-size:28px;margin:0 0 4px;letter-spacing:-.02em}
+h1 img{display:block;height:64px;width:auto}
+h1 .logo-d{display:none}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) h1 .logo-l{display:none}:root:not([data-theme="light"]) h1 .logo-d{display:block}}
+:root[data-theme="dark"] h1 .logo-l{display:none}:root[data-theme="dark"] h1 .logo-d{display:block}
+p{margin:0;color:var(--muted);text-wrap:balance}
+code{font:12px ui-monospace,monospace}
+.card{background:var(--tile);border-radius:12px;box-shadow:0 0 0 1px var(--line);padding:20px;display:flex;flex-direction:column;gap:12px}
+
+.bar{position:sticky;top:0;z-index:2;background:var(--canvas);padding:8px 0;display:flex;flex-wrap:wrap;gap:8px 16px;font-size:13px}
+.seg{flex-wrap:wrap;max-width:100%}
+.seg{display:inline-flex;background:var(--tile);box-shadow:inset 0 0 0 1px var(--line);border-radius:999px;padding:3px}
+.seg button{all:unset;padding:3px 10px;border-radius:999px;cursor:pointer;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--tile)}
+.seg button:focus-visible{outline:2px solid var(--hue);outline-offset:2px}
+@media (pointer:coarse){.seg button{padding:8px 12px}}
+#seen{display:flex;flex-direction:column;gap:16px}
+
+.solid{background:var(--hue);--achura-on:var(--hue)}
+.tint{--achura-ink:var(--hue);--achura-a:1}
+.plain .tint{background:color-mix(in srgb,var(--hue) calc(var(--w)*1%),transparent)}
+.w10{--w:10}.w20{--w:20}.w30{--w:30}.w40{--w:40}.w50{--w:50}.w60{--w:60}.w70{--w:70}.w80{--w:80}.w90{--w:90}
+
+.weights{display:grid;grid-template-columns:72px repeat(9,minmax(0,1fr));gap:4px;align-items:center;font-size:12px;color:var(--muted)}
+.weights>span{text-align:center}.weights>span:first-child{text-align:left}
+.weights i{height:32px;border-radius:4px}
+
+.strip{display:flex;gap:3px;height:40px;border-radius:8px;overflow:hidden}
+.keys{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px}
+.keys span{white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.keys .achura-key{width:20px;height:20px}
+.plain,.plain *{--achura-a:0!important}
+
+footer nav{max-width:760px;margin:0 auto;padding:0 16px;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+footer a{color:var(--ink);font-size:17px;font-weight:600;text-underline-offset:3px}
+footer code{color:var(--muted);overflow-wrap:anywhere}
+footer svg{display:block;width:100%;height:auto;min-height:220px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="protan" color-interpolation-filters="linearRGB"><feColorMatrix values="0.152286 1.052583 -0.204868 0 0  0.114503 0.786281 0.099216 0 0  -0.003882 -0.048116 1.051998 0 0  0 0 0 1 0"/></filter>
+  <filter id="deutan" color-interpolation-filters="linearRGB"><feColorMatrix values="0.367322 0.860646 -0.227968 0 0  0.280085 0.672501 0.047413 0 0  -0.011820 0.042940 0.968881 0 0  0 0 0 1 0"/></filter>
+  <filter id="tritan" color-interpolation-filters="linearRGB"><feColorMatrix values="1.255528 -0.076749 -0.178779 0 0  -0.078411 0.930809 0.147602 0 0  0.004733 0.691367 0.303900 0 0  0 0 0 1 0"/></filter>
+  <filter id="gray" color-interpolation-filters="linearRGB"><feColorMatrix type="saturate" values="0"/></filter>
+</svg>
+<main>
+  <header>
+    <h1><img class="logo-l" src="docs/logo/achura-light.svg" alt="achura"><img class="logo-d" src="docs/logo/achura-dark.svg" alt=""></h1>
+    <p>Textures and shades for anything with a fill.</p>
+  </header>
+
+  <div class="bar">
+    <div class="seg" role="group" aria-label="Theme" id="theme">
+      <button type="button" data-t="" aria-pressed="true">Auto</button>
+      <button type="button" data-t="light" aria-pressed="false">Light</button>
+      <button type="button" data-t="dark" aria-pressed="false">Dark</button>
+    </div>
+    <div class="seg" role="group" aria-label="Color vision" id="vision">
+      <button type="button" data-v="" aria-pressed="true">Normal</button>
+      <button type="button" data-v="deutan" aria-pressed="false">Deutan</button>
+      <button type="button" data-v="protan" aria-pressed="false">Protan</button>
+      <button type="button" data-v="tritan" aria-pressed="false">Tritan</button>
+      <button type="button" data-v="gray" aria-pressed="false">Gray</button>
+    </div>
+    <div class="seg" role="group" aria-label="Fill" id="textures">
+      <button type="button" data-x="on" aria-pressed="true">Textures</button>
+      <button type="button" data-x="off" aria-pressed="false">Color only</button>
+    </div>
+  </div>
+
+  <div id="seen">
+    <section class="card">
+      <div class="weights">
+      <!--weights-->
+      <span>cover %</span><span>10</span><span>20</span><span>30</span><span>40</span><span>50</span><span>60</span><span>70</span><span>80</span><span>90</span>
+      <code>diag</code><i class="tint w10 achura achura-diag-10"></i><i class="tint w20 achura achura-diag-20"></i><i class="tint w30 achura achura-diag-30"></i><i class="tint w40 achura achura-diag-40"></i><i class="tint w50 achura achura-diag-50"></i><i class="tint w60 achura achura-diag-60"></i><i class="tint w70 achura achura-diag-70"></i><i class="tint w80 achura achura-diag-80"></i><i class="tint w90 achura achura-diag-90"></i>
+      <code>dots</code><i class="tint w10 achura achura-dots-10"></i><i class="tint w20 achura achura-dots-20"></i><i class="tint w30 achura achura-dots-30"></i><i class="tint w40 achura achura-dots-40"></i><i class="tint w50 achura achura-dots-50"></i><i class="tint w60 achura achura-dots-60"></i><i class="tint w70 achura achura-dots-70"></i><i class="tint w80 achura achura-dots-80"></i><i class="tint w90 achura achura-dots-90"></i>
+      <code>back</code><i class="tint w10 achura achura-back-10"></i><i class="tint w20 achura achura-back-20"></i><i class="tint w30 achura achura-back-30"></i><i class="tint w40 achura achura-back-40"></i><i class="tint w50 achura achura-back-50"></i><i class="tint w60 achura achura-back-60"></i><i class="tint w70 achura achura-back-70"></i><i class="tint w80 achura achura-back-80"></i><i class="tint w90 achura achura-back-90"></i>
+      <code>squiggle</code><i class="tint w10 achura achura-squiggle-10"></i><i class="tint w20 achura achura-squiggle-20"></i><i class="tint w30 achura achura-squiggle-30"></i><i class="tint w40 achura achura-squiggle-40"></i><i class="tint w50 achura achura-squiggle-50"></i><i class="tint w60 achura achura-squiggle-60"></i><i class="tint w70 achura achura-squiggle-70"></i><i class="tint w80 achura achura-squiggle-80"></i><i class="tint w90 achura achura-squiggle-90"></i>
+      <code>grid</code><i class="tint w10 achura achura-grid-10"></i><i class="tint w20 achura achura-grid-20"></i><i class="tint w30 achura achura-grid-30"></i><i class="tint w40 achura achura-grid-40"></i><i class="tint w50 achura achura-grid-50"></i><i class="tint w60 achura achura-grid-60"></i><i class="tint w70 achura achura-grid-70"></i><i class="tint w80 achura achura-grid-80"></i><i class="tint w90 achura achura-grid-90"></i>
+      <code>zigzag</code><i class="tint w10 achura achura-zigzag-10"></i><i class="tint w20 achura achura-zigzag-20"></i><i class="tint w30 achura achura-zigzag-30"></i><i class="tint w40 achura achura-zigzag-40"></i><i class="tint w50 achura achura-zigzag-50"></i><i class="tint w60 achura achura-zigzag-60"></i><i class="tint w70 achura achura-zigzag-70"></i><i class="tint w80 achura achura-zigzag-80"></i><i class="tint w90 achura achura-zigzag-90"></i>
+      <code>hex</code><i class="tint w10 achura achura-hex-10"></i><i class="tint w20 achura achura-hex-20"></i><i class="tint w30 achura achura-hex-30"></i><i class="tint w40 achura achura-hex-40"></i><i class="tint w50 achura achura-hex-50"></i><i class="tint w60 achura achura-hex-60"></i><i class="tint w70 achura achura-hex-70"></i><i class="tint w80 achura achura-hex-80"></i><i class="tint w90 achura achura-hex-90"></i>
+      <code>squares</code><i class="tint w10 achura achura-squares-10"></i><i class="tint w20 achura achura-squares-20"></i><i class="tint w30 achura achura-squares-30"></i><i class="tint w40 achura achura-squares-40"></i><i class="tint w50 achura achura-squares-50"></i><i class="tint w60 achura achura-squares-60"></i><i class="tint w70 achura achura-squares-70"></i><i class="tint w80 achura achura-squares-80"></i><i class="tint w90 achura achura-squares-90"></i>
+      <code>rings</code><i class="tint w10 achura achura-rings-10"></i><i class="tint w20 achura achura-rings-20"></i><i class="tint w30 achura achura-rings-30"></i><i class="tint w40 achura achura-rings-40"></i><i class="tint w50 achura achura-rings-50"></i><i class="tint w60 achura achura-rings-60"></i><i class="tint w70 achura achura-rings-70"></i><i class="tint w80 achura achura-rings-80"></i><i class="tint w90 achura achura-rings-90"></i>
+      <code>rows</code><i class="tint w10 achura achura-rows-10"></i><i class="tint w20 achura achura-rows-20"></i><i class="tint w30 achura achura-rows-30"></i><i class="tint w40 achura achura-rows-40"></i><i class="tint w50 achura achura-rows-50"></i><i class="tint w60 achura achura-rows-60"></i><i class="tint w70 achura achura-rows-70"></i><i class="tint w80 achura achura-rows-80"></i><i class="tint w90 achura achura-rows-90"></i>
+      <code>scales</code><i class="tint w10 achura achura-scales-10"></i><i class="tint w20 achura achura-scales-20"></i><i class="tint w30 achura achura-scales-30"></i><i class="tint w40 achura achura-scales-40"></i><i class="tint w50 achura achura-scales-50"></i><i class="tint w60 achura achura-scales-60"></i><i class="tint w70 achura achura-scales-70"></i><i class="tint w80 achura achura-scales-80"></i><i class="tint w90 achura achura-scales-90"></i>
+      <code>cols</code><i class="tint w10 achura achura-cols-10"></i><i class="tint w20 achura achura-cols-20"></i><i class="tint w30 achura achura-cols-30"></i><i class="tint w40 achura achura-cols-40"></i><i class="tint w50 achura achura-cols-50"></i><i class="tint w60 achura achura-cols-60"></i><i class="tint w70 achura achura-cols-70"></i><i class="tint w80 achura achura-cols-80"></i><i class="tint w90 achura achura-cols-90"></i>
+      <code>cross</code><i class="tint w10 achura achura-cross-10"></i><i class="tint w20 achura achura-cross-20"></i><i class="tint w30 achura achura-cross-30"></i><i class="tint w40 achura achura-cross-40"></i><i class="tint w50 achura achura-cross-50"></i><i class="tint w60 achura achura-cross-60"></i><i class="tint w70 achura achura-cross-70"></i><i class="tint w80 achura achura-cross-80"></i><i class="tint w90 achura achura-cross-90"></i>
+      <code>meander</code><i class="tint w10 achura achura-meander-10"></i><i class="tint w20 achura achura-meander-20"></i><i class="tint w30 achura achura-meander-30"></i><i class="tint w40 achura achura-meander-40"></i><i class="tint w50 achura achura-meander-50"></i><i class="tint w60 achura achura-meander-60"></i><i class="tint w70 achura achura-meander-70"></i><i class="tint w80 achura achura-meander-80"></i><i class="tint w90 achura achura-meander-90"></i>
+      <code>stars</code><i class="tint w10 achura achura-stars-10"></i><i class="tint w20 achura achura-stars-20"></i><i class="tint w30 achura achura-stars-30"></i><i class="tint w40 achura achura-stars-40"></i><i class="tint w50 achura achura-stars-50"></i><i class="tint w60 achura achura-stars-60"></i><i class="tint w70 achura achura-stars-70"></i><i class="tint w80 achura achura-stars-80"></i><i class="tint w90 achura achura-stars-90"></i>
+      <!--/weights-->
+      </div>
+    </section>
+    <section class="card">
+      <div class="strip" aria-hidden="true">
+        <i class="solid achura achura-diag" style="--hue:var(--blue);flex:34"></i>
+        <i class="solid achura achura-dots" style="--hue:var(--green);flex:24"></i>
+        <i class="solid achura achura-back" style="--hue:var(--red);flex:20"></i>
+        <i class="solid achura achura-squiggle" style="--hue:var(--orange);flex:14"></i>
+        <i class="solid achura achura-grid" style="--hue:var(--purple);flex:8"></i>
+      </div>
+      <div class="keys">
+        <span><i class="achura-key solid achura achura-diag" style="--hue:var(--blue)"></i>Search 34%</span>
+        <span><i class="achura-key solid achura achura-dots" style="--hue:var(--green)"></i>Direct 24%</span>
+        <span><i class="achura-key solid achura achura-back" style="--hue:var(--red)"></i>Social 20%</span>
+        <span><i class="achura-key solid achura achura-squiggle" style="--hue:var(--orange)"></i>Email 14%</span>
+        <span><i class="achura-key solid achura achura-grid" style="--hue:var(--purple)"></i>Ads 8%</span>
+      </div>
+    </section>
+  </div>
+</main>
+<footer>
+  <nav>
+    <a href="https://github.com/sryo/achura">github.com/sryo/achura</a>
+    <code>&lt;link rel="stylesheet" href="achura.css"&gt;</code>
+    <code>&lt;div class="achura achura-dots" style="background:#2F5BEA;--achura-on:#2F5BEA;height:48px"&gt;&lt;/div&gt;</code>
+    <code>&lt;div class="achura achura-dots-30" style="background:#2F5BEA;--achura-on:#2F5BEA;height:48px"&gt;&lt;/div&gt;</code>
+  </nav>
+  <div id="pampa"></div>
+</footer>
+<script type="module">
+import { pampa } from './docs/footer/pampa.js';
+
+pampa(document.getElementById('pampa'));
+
+const press = (group, btn) => group.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b === btn));
+document.getElementById('theme').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  press(e.currentTarget, b);
+  if (b.dataset.t) document.documentElement.dataset.theme = b.dataset.t; else delete document.documentElement.dataset.theme;
+};
+document.getElementById('textures').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  press(e.currentTarget, b);
+  document.getElementById('seen').classList.toggle('plain', b.dataset.x === 'off');
+};
+document.getElementById('vision').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  press(e.currentTarget, b);
+  document.getElementById('seen').style.filter = b.dataset.v ? `url(#${b.dataset.v})` : '';
+};
+</script>
+</body>
+</html>

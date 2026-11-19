@@ -1,0 +1,18 @@
+{
+  "name": "achura",
+  "version": "0.1.0",
+  "description": "Textures and shades for anything with a fill",
+  "type": "module",
+  "exports": {
+    ".": "./achura.js",
+    "./shade": "./shade.js",
+    "./css": "./css.js",
+    "./achura.css": "./achura.css",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "license": "SEE LICENSE IN LICENSE"
+}
