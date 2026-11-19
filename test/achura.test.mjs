@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { cover, raster, device, similar, seams } from './raster.mjs';
 import { shade, ramp } from '../shade.js';
-import { STEPS, css } from '../css.js';
+import { STEPS, coarse, css } from '../css.js';
 import { outputs } from '../build.mjs';
 import { GLYPHS, INK, glyph, name, svg, url, pattern, mask, ink, keyed } from '../achura.js';
 
@@ -145,7 +145,7 @@ test('css, svg and url carry every glyph', () => {
     assert.ok(svg(g.name).includes(g.d));
     assert.ok(decodeURIComponent(url(g.name)).includes(g.d));
   }
-  assert.ok(css({ prefix: 'cb' }).startsWith(':where(.cb){position:relative}.cb::after{'));
+  assert.ok(css({ prefix: 'cb' }).startsWith('@property --cb-k{syntax:"<number>";inherits:false;initial-value:1}:where(.cb){position:relative;--_m:'));
   for (const bad of ['', '1x', 'a b', 'x{}', '-a']) assert.throws(() => css({ prefix: bad }), RangeError, bad);
   assert.ok(sheet.includes('-webkit-mask:') && sheet.includes('@media (forced-colors:active)'));
 });
@@ -171,15 +171,20 @@ test('achura.css and index.html are built', () => {
 });
 
 test('every glyph has a class for every step', () => {
-  const sheet = css(), rule = (sel, of) => `${sel}{--achura-g:${url(of)}}`;
+  const sheet = css(), rule = (sel, of, k = 1) => `${sel}{--achura-g:${url(of)}${k > 1 ? `;--achura-k:${k}` : ''}}`;
   for (const g of GLYPHS) for (const s of STEPS) {
     const c = `.achura-${g.name}`;
-    const want = s === 20 ? rule(`${c}-20,${c}`, g) : rule(`${c}-${s}`, s === 80 ? { ...g, invert: true } : shade(g, s / 100));
+    const want = s === 20 ? rule(`${c}-20,${c}`, g) : rule(`${c}-${s}`, s === 80 ? { ...g, invert: true } : shade(g, s / 100), coarse(s));
     assert.ok(sheet.includes(want), `${g.name} at ${s}`);
   }
   const own = css({ prefix: 'cb', steps: [25] });
   for (const g of GLYPHS) assert.ok(own.includes(rule(`.cb-${g.name}`, g).replace('--achura-g', '--cb-g')) && own.includes(`.cb-${g.name}-25{--cb-g:`), g.name);
   for (const bad of [[12.5], [120], [-10]]) assert.throws(() => css({ steps: bad }), RangeError, String(bad));
+});
+
+test('the lightest and heaviest steps draw on a bigger tile', () => {
+  assert.deepEqual(STEPS.map(coarse), [2, 1, 1, 1, 1, 1, 1, 1, 2]);
+  assert.equal(css().match(/;--achura-k:2\}/g).length, 2 * GLYPHS.length);
 });
 
 test('a glyph gets heavier with every step', () => {
