@@ -1,19 +1,12 @@
-// The site's footer: a cow in the pampa. Every layer is one shape with one achura fill, printed see-through,
-// so the only mixing is where shapes overlap. Colors come from the page's --sky, --red… custom properties.
-import { pattern } from '../../achura.js';
-import { shade } from '../../shade.js';
+// The site's footer: a cow in the pampa, as markup. Every layer is one element with one achura class, printed
+// see-through, so the only mixing is where shapes overlap. Colors come from the page's --sky, --red… custom
+// properties. build.mjs writes this into index.html; the page needs no script for it.
+import { STEPS } from '../../css.js';
 
-let n = 0;
-const defs = [];
-// A texture in one ink. `at` is the point it turns around; `drift` is [degrees, seconds].
-function tex(g, hue, { cover = .28, size = 8, rot = 0, at = [0, 0], drift } = {}) {
-  const id = `pampa-${n++}`;
-  const attrs = `patternTransform="rotate(${rot} ${at})"` + (drift ? ` data-drift="${rot},${at},${drift}"` : '');
-  defs.push(`<g style="color:var(--${hue})">${pattern(shade(g, cover), { id, size, ink: 'currentColor' }).replace('<pattern ', `<pattern ${attrs} `)}</g>`);
-  return `style="mix-blend-mode:var(--blend,multiply)" fill="url(#${id})"`;
-}
 const W = 1200, H = 440;
 const f = v => +v.toFixed(1);
+const pc = v => `${+v.toFixed(2)}%`;
+const step = cover => STEPS.reduce((a, s) => Math.abs(s - cover * 100) < Math.abs(a - cover * 100) ? s : a);
 
 // A closed, smooth, slightly lumpy shape around (cx, cy); `seed` picks the lumps.
 function blob(cx, cy, rx, ry, seed, n = 9, lump = .16) {
@@ -27,7 +20,56 @@ function blob(cx, cy, rx, ry, seed, n = 9, lump = .16) {
     return `C${f(p[0] + (b[0] - a[0]) / 6)} ${f(p[1] + (b[1] - a[1]) / 6)} ${f(b[0] - (c[0] - p[0]) / 6)} ${f(b[1] - (c[1] - p[1]) / 6)} ${f(b[0])} ${f(b[1])}`;
   }).join('') + 'Z';
 }
-const shape = (d, fill) => `<path d="${d}" ${fill}/>`;
+
+// The corners of a path, its curves cut into short lines: clip-path takes a polygon in percentages, which scales
+// with the drawing. Absolute M L H V C S Z only.
+function outline(d, cuts = 6) {
+  const pts = [], n = d.match(/[MLHVCSZ]|-?[\d.]+/g);
+  let x = 0, y = 0, cx = 0, cy = 0, i = 0, cmd;
+  const num = () => +n[i++];
+  const curve = (x1, y1, x2, y2, x3, y3) => {
+    for (let k = 1; k <= cuts; k++) {
+      const t = k / cuts, u = 1 - t;
+      pts.push([u * u * u * x + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3, u * u * u * y + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3]);
+    }
+    [cx, cy, x, y] = [x2, y2, x3, y3];
+  };
+  while (i < n.length) {
+    if (/[A-Z]/.test(n[i])) cmd = n[i++];
+    if (cmd === 'Z') continue;
+    if (cmd === 'C') curve(num(), num(), num(), num(), num(), num());
+    else if (cmd === 'S') curve(2 * x - cx, 2 * y - cy, num(), num(), num(), num());
+    else {
+      if (cmd === 'H') x = num(); else if (cmd === 'V') y = num(); else [x, y] = [num(), num()];
+      [cx, cy] = [x, y];
+      pts.push([x, y]);
+    }
+  }
+  return pts;
+}
+
+// A texture in one ink. `at` is the point it turns around; `drift` is [degrees, seconds].
+const ink = (g, hue, { cover = .28, size = 8 } = {}) =>
+  [`achura achura-x1 achura-${g}-${step(cover)}`, `--achura-ink:var(--${hue});--achura-size:round(calc(var(--u)*${f(size)}),1px)`];
+const box = (x, y, w, h) => `left:${pc(x / W * 100)};top:${pc(y / H * 100)};width:${pc(w / W * 100)};height:${pc(h / H * 100)}`;
+
+// One element: the shape's box, clipped to its outline.
+function shape(pts, g, hue, o = {}) {
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const x = Math.min(...xs), y = Math.min(...ys), w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+  const clip = `clip-path:polygon(${pts.map(p => `${pc((p[0] - x) / w * 100)} ${pc((p[1] - y) / h * 100)}`).join(',')})`;
+  const [cls, vars] = ink(g, hue, o);
+  if (!o.drift) return `<i class="${cls}" style="${box(x, y, w, h)};${clip};${vars}"></i>`;
+  return `<i style="${box(x, y, w, h)};${clip}">${turning(x, y, w, h, cls, vars, o)}</i>`;
+}
+
+// A texture that sways sits in a bigger box inside its shape, so turning it never uncovers a corner.
+function turning(x, y, w, h, cls, vars, { rot = 0, at = [x + w / 2, y + h / 2], drift: [amp, secs] }) {
+  const pad = Math.max(w, h) * .2, iw = w + 2 * pad, ih = h + 2 * pad;
+  return `<i class="sway ${cls}" style="left:${pc(-pad / w * 100)};top:${pc(-pad / h * 100)};width:${pc(iw / w * 100)};height:${pc(ih / h * 100)};`
+    + `transform-origin:${pc((at[0] - x + pad) / iw * 100)} ${pc((at[1] - y + pad) / ih * 100)};--from:${f(rot - amp)}deg;--to:${f(rot + amp)}deg;animation-duration:${secs / 2}s;${vars}"></i>`;
+}
+const path = (d, g, hue, o) => shape(outline(d), g, hue, o);
 
 // Cow, facing left in a 240×150 box with the hooves on y = 150. Back to front, each part one fill.
 const COW = [
@@ -47,49 +89,33 @@ const COW = [
   ['M56 34C66 25 80 30 77 40C68 46 60 44 56 34Z', 'diag', 'red', { cover: .6, size: 5 }],
   ['M44 30C35 24 34 13 41 6C41 15 46 22 52 27Z', 'rows', 'ink', { cover: .6, size: 4 }],
 ];
-function cow({ x, y, s = 1, flip = false, far = false }) {
-  const place = flip ? `translate(${x + 240 * s} ${y}) scale(${-s} ${s}) translate(0 -150)` : `translate(${x} ${y}) scale(${s}) translate(0 -150)`;
-  const one = far && tex('dots', 'ink', { cover: .4, size: 4 / s });
-  return `<g transform="${place}">`
-    + COW.map(([d, g, hue, o]) => shape(d, one || tex(g, hue, { ...o, size: (o.size ?? 10) / s }))).join('')
-    + (far ? '' : `<circle cx="30" cy="54" r="2.6" style="fill:var(--ink)"/>`) + '</g>';
+function cow({ x, y, s = 1, far = false }) {
+  const place = ([px, py]) => [x + s * px, y + s * (py - 150)];
+  return COW.map(([d, g, hue, o]) => shape(outline(d).map(place), ...(far ? ['dots', 'ink', { cover: .4, size: 4 }] : [g, hue, { ...o, size: o.size ?? 10 }]))).join('')
+    + (far ? '' : `<i class="eye" style="${box(...place([27.4, 51.4]), 5.2 * s, 5.2 * s)}"></i>`);
 }
 
-const parts = [
+const parts = () => [
   // sky, sun, clouds
-  `<rect width="${W}" height="300" mask="url(#pampa-fade)" ${tex('rows', 'sky', { cover: .1, size: 12 })}/>`,
-  `<circle cx="420" cy="240" r="100" ${tex('rows', 'orange', { cover: .3, size: 11, rot: 4, at: [420, 240], drift: [3, 24] })}/>`,
-  shape(blob(150, 120, 96, 34, 1, 9, .22), tex('dots', 'pink', { cover: .22 })), shape(blob(210, 138, 80, 26, 2, 9, .22), tex('dots', 'sky', { cover: .22, size: 8.7 })),
-  shape(blob(900, 104, 120, 38, 5, 9, .22), tex('dots', 'pink', { cover: .22 })), shape(blob(980, 126, 92, 30, 7, 9, .22), tex('dots', 'sky', { cover: .22, size: 8.7 })),
+  `<i class="fade" style="${box(0, 0, W, 300)}">${(([cls, vars]) => `<i class="${cls}" style="inset:0;${vars}"></i>`)(ink('rows', 'sky', { cover: .1, size: 12 }))}</i>`,
+  `<i class="round" style="${box(320, 140, 200, 200)}">${turning(320, 140, 200, 200, ...ink('rows', 'orange', { cover: .3, size: 11 }), { rot: 4, drift: [3, 24] })}</i>`,
+  path(blob(150, 120, 96, 34, 1, 9, .22), 'dots', 'pink', { cover: .22 }), path(blob(210, 138, 80, 26, 2, 9, .22), 'dots', 'sky', { cover: .22, size: 8.7 }),
+  path(blob(900, 104, 120, 38, 5, 9, .22), 'dots', 'pink', { cover: .22 }), path(blob(980, 126, 92, 30, 7, 9, .22), 'dots', 'sky', { cover: .22, size: 8.7 }),
   // sierras
-  shape('M0 262C120 230 200 250 300 236S470 200 560 232S760 262 860 240S1080 214 1200 246V304H0Z', tex('diag', 'blue', { cover: .2 })),
-  shape('M0 282C160 250 260 284 420 262S640 240 760 268S1000 284 1200 258V308H0Z', tex('diag', 'purple', { cover: .2, size: 8.6, rot: -5, at: [600, 280], drift: [1.5, 28] })),
+  path('M0 262C120 230 200 250 300 236S470 200 560 232S760 262 860 240S1080 214 1200 246V304H0Z', 'diag', 'blue', { cover: .2 }),
+  path('M0 282C160 250 260 284 420 262S640 240 760 268S1000 284 1200 258V308H0Z', 'diag', 'purple', { cover: .2, size: 8.6, rot: -5, at: [600, 280], drift: [1.5, 28] }),
   // fields
-  shape(`M0 296C300 280 700 304 1200 288V340H0Z`, tex('cols', 'green', { cover: .16 })),
-  shape(`M0 326C260 304 520 344 800 322S1080 310 1200 320V384H0Z`, tex('squiggle', 'yellow', { cover: .22 })),
-  shape(`M0 366C200 350 460 384 720 366S1040 356 1200 372V${H}H0Z`, tex('zigzag', 'green', { cover: .16 })),
+  path(`M0 296C300 280 700 304 1200 288V340H0Z`, 'cols', 'green', { cover: .16 }),
+  path(`M0 326C260 304 520 344 800 322S1080 310 1200 320V384H0Z`, 'squiggle', 'yellow', { cover: .22 }),
+  path(`M0 366C200 350 460 384 720 366S1040 356 1200 372V${H}H0Z`, 'zigzag', 'green', { cover: .16 }),
   cow({ x: 500, y: 346, s: .3, far: true }),
   // ombú
-  shape('M132 410C162 402 176 380 180 346C182 326 172 306 160 290L172 284C184 298 192 306 198 306C204 300 208 284 212 262L224 264C222 290 222 304 228 310C240 304 254 296 266 284L274 294C258 308 238 322 232 346C230 380 240 402 268 410C230 416 170 416 132 410Z', tex('cols', 'bark', { cover: .5, size: 5 })),
-  shape(blob(140, 286, 78, 60, 4, 9, .18), tex('scales', 'green', { cover: .34 })),
-  shape(blob(236, 252, 86, 66, 9, 9, .18), tex('scales', 'sky', { cover: .34, size: 8.7 })),
-  shape(blob(290, 308, 62, 46, 6, 9, .18), tex('scales', 'green', { cover: .34, size: 7.4 })),
+  path('M132 410C162 402 176 380 180 346C182 326 172 306 160 290L172 284C184 298 192 306 198 306C204 300 208 284 212 262L224 264C222 290 222 304 228 310C240 304 254 296 266 284L274 294C258 308 238 322 232 346C230 380 240 402 268 410C230 416 170 416 132 410Z', 'cols', 'bark', { cover: .5, size: 5 }),
+  path(blob(140, 286, 78, 60, 4, 9, .18), 'scales', 'green', { cover: .34 }),
+  path(blob(236, 252, 86, 66, 9, 9, .18), 'scales', 'sky', { cover: .34, size: 8.7 }),
+  path(blob(290, 308, 62, 46, 6, 9, .18), 'scales', 'green', { cover: .34, size: 7.4 }),
   // the cow
   cow({ x: 650, y: 420, s: 1.25 }),
 ];
 
-const SVG = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice" role="img" aria-label="A cow in the pampa, drawn in achura textures"><defs>`
-  + `<linearGradient id="pampa-fg" x2="0" y2="1"><stop offset=".2" stop-color="#000"/><stop offset=".6" stop-color="#fff"/></linearGradient><mask id="pampa-fade"><rect width="${W}" height="300" fill="url(#pampa-fg)"/></mask>`
-  + `${defs.join('')}</defs>${parts.join('')}</svg>`;
-
-export function pampa(el) {
-  el.innerHTML = SVG;
-  if (matchMedia('(prefers-reduced-motion:reduce)').matches) return;
-  const moving = [...el.querySelectorAll('[data-drift]')].map(p => [p, ...p.dataset.drift.split(',').map(Number)]);
-  const tick = t => {
-    for (const [p, rot, cx, cy, amp, secs] of moving)
-      p.setAttribute('patternTransform', `rotate(${(rot + amp * Math.sin(t / 1000 / secs * 2 * Math.PI)).toFixed(3)} ${cx} ${cy})`);
-    requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
-}
+export const pampa = () => `<div class="pampa" role="img" aria-label="A cow in the pampa, drawn in achura textures">\n${parts().map(p => `      ${p}\n`).join('')}    </div>`;

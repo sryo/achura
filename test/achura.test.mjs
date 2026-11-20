@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { cover, raster, device, similar, seams } from './raster.mjs';
 import { shade, ramp } from '../shade.js';
-import { STEPS, coarse, css } from '../css.js';
+import { STEPS, SIZES, coarse, css } from '../css.js';
 import { outputs } from '../build.mjs';
 import { GLYPHS, INK, glyph, name, svg, url, pattern, mask, ink, keyed } from '../achura.js';
 
@@ -145,7 +145,7 @@ test('css, svg and url carry every glyph', () => {
     assert.ok(svg(g.name).includes(g.d));
     assert.ok(decodeURIComponent(url(g.name)).includes(g.d));
   }
-  assert.ok(css({ prefix: 'cb' }).startsWith('@property --cb-k{syntax:"<number>";inherits:false;initial-value:1}:where(.cb){position:relative;--_m:'));
+  assert.ok(css({ prefix: 'cb' }).startsWith('@property --cb-x{syntax:"<number>";inherits:false;initial-value:0}@property --cb-auto{syntax:"<number>";inherits:false;initial-value:1}:where(.cb){position:relative;--_m:'));
   for (const bad of ['', '1x', 'a b', 'x{}', '-a']) assert.throws(() => css({ prefix: bad }), RangeError, bad);
   assert.ok(sheet.includes('-webkit-mask:') && sheet.includes('@media (forced-colors:active)'));
 });
@@ -171,10 +171,10 @@ test('achura.css and index.html are built', () => {
 });
 
 test('every glyph has a class for every step', () => {
-  const sheet = css(), rule = (sel, of, k = 1) => `${sel}{--achura-g:${url(of)}${k > 1 ? `;--achura-k:${k}` : ''}}`;
+  const sheet = css(), rule = (sel, of, k = 1) => `${sel}{--achura-g:${url(of)}${k > 1 ? `;--achura-auto:${k}` : ''}}`;
   for (const g of GLYPHS) for (const s of STEPS) {
     const c = `.achura-${g.name}`;
-    const want = s === 20 ? rule(`${c}-20,${c}`, g) : rule(`${c}-${s}`, s === 80 ? { ...g, invert: true } : shade(g, s / 100), coarse(s));
+    const want = s === 20 ? rule(`${c}-20,${c}`, g) : rule(`${c}-${s}`, s === 80 ? { ...g, invert: true } : shade(g, s / 100), coarse(g, s));
     assert.ok(sheet.includes(want), `${g.name} at ${s}`);
   }
   const own = css({ prefix: 'cb', steps: [25] });
@@ -183,8 +183,18 @@ test('every glyph has a class for every step', () => {
 });
 
 test('the lightest and heaviest steps draw on a bigger tile', () => {
-  assert.deepEqual(STEPS.map(coarse), [2, 1, 1, 1, 1, 1, 1, 1, 2]);
-  assert.equal(css().match(/;--achura-k:2\}/g).length, 2 * GLYPHS.length);
+  assert.deepEqual(STEPS.map(s => coarse(glyph('rows'), s)), [2, 1, 1, 1, 1, 1, 1, 1, 2]);
+  for (const n of ['dots', 'squares', 'stars']) assert.ok(STEPS.every(s => coarse(glyph(n), s) === 1), n);
+  assert.equal(css().match(/;--achura-auto:2\}/g).length, 2 * (GLYPHS.length - 3));
+});
+
+test('a size class sets the tile at any cover', () => {
+  const sheet = css();
+  for (const k of SIZES) assert.ok(sheet.includes(`.achura-x${k}{--achura-x:${k}}`), `x${k}`);
+  // A size class wins over a step's own tile; 0 means no size class.
+  assert.ok(sheet.includes('max(var(--achura-x,0),(1 - min(var(--achura-x,0),1))*var(--achura-auto,1))'));
+  assert.ok(css({ sizes: [6] }).includes('.achura-x6{--achura-x:6}'));
+  for (const bad of [[0], [-1], [1.5], [NaN]]) assert.throws(() => css({ sizes: bad }), RangeError, String(bad));
 });
 
 test('a glyph gets heavier with every step', () => {

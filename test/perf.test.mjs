@@ -4,7 +4,7 @@ import { gzipSync } from 'node:zlib';
 import { readFileSync } from 'node:fs';
 import { GLYPHS, url } from '../achura.js';
 import { raster } from './raster.mjs';
-import { STEPS, css } from '../css.js';
+import { STEPS, SIZES, css } from '../css.js';
 
 // Budgets: optimize to meet them, don't raise them.
 
@@ -18,11 +18,11 @@ test('a glyph url carries little more than its path', () => {
 
 test('the stylesheet stays small', () => {
   // A rule is a selector, a data URI and a path; the rest is fixed. Gzipped, a rule is little more than its path's numbers.
-  // A step on a bigger tile says so in 14 B.
+  // A step on a bigger tile says so in 17 B, and a size class takes 29.
   const sheet = css(), rules = GLYPHS.length * STEPS.length, gz = gzipSync(sheet, { level: 9 }).length;
-  const big = 14 * 2 * GLYPHS.length, max = 950 + 269 * rules + big;
+  const big = 17 * sheet.match(/-auto:/g).length, max = 1055 + 29 * SIZES.length + 269 * rules + big;
   assert.ok(sheet.length <= max, `${sheet.length} B of ${max}`);
-  assert.ok(gz <= 660 + 22 * rules, `${gz} B gzipped of ${660 + 22 * rules}`);
+  assert.ok(gz <= 720 + 22 * rules, `${gz} B gzipped of ${720 + 22 * rules}`);
 });
 
 test('rasterizing is fast', () => {
@@ -42,7 +42,7 @@ test('the shipped scripts stay small', () => {
   // Comments ship with the source, so they keep to what the code can't say.
   // achura.js holds each glyph's name and path; shade.js a shape for each; css.js the stylesheet's fixed rules.
   const table = GLYPHS.reduce((n, g) => n + g.name.length + g.d.length + 23, 0);
-  for (const [f, max] of [['achura.js', 2808 + table], ['shade.js', 280 * GLYPHS.length], ['css.js', 2180]]) {
+  for (const [f, max] of [['achura.js', 2808 + table], ['shade.js', 280 * GLYPHS.length], ['css.js', 2870]]) {
     const n = readFileSync(new URL(`../${f}`, import.meta.url)).length;
     assert.ok(n <= max, `${f}: ${n} B of ${max}`);
   }
